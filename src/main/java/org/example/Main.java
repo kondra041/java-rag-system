@@ -19,13 +19,21 @@ public class Main {
             Path projectDir = Paths.get(ConfigLoader.getProjectDir());
             checkConnection();
 
-            // Проверяем, существует ли коллекция в Milvus
-            if (!MilvusV2.hasCollection()) {
-                System.out.println("Коллекции не найдены");
-                return;
+            deleteCollectionByName(CODE_TESTS_COLLECTION);
+            deleteCollectionByName(PROJECT_KNOWLEDGE_COLLECTION);
+            if (!MilvusV2.hasCollectionByName(CODE_TESTS_COLLECTION)) {
+                System.out.println("Коллекция "+ CODE_TESTS_COLLECTION + " не найдена");
+                createTestsCollection();
             }
 
+            if (!MilvusV2.hasCollectionByName(PROJECT_KNOWLEDGE_COLLECTION)) {
+                System.out.println("Коллекция "+ PROJECT_KNOWLEDGE_COLLECTION + " не найдена");
+                createCodeCollection();
+            }
+
+            System.out.println("Кол-во записей в БЗ "+ getRowCount(PROJECT_KNOWLEDGE_COLLECTION));
             if(getRowCount(PROJECT_KNOWLEDGE_COLLECTION) == 0) {
+
                 System.out.println("Парсим проект и сохраняем данные...");
                 parseProject(Paths.get(ConfigLoader.getProjectDir() + "/src/main/").toFile());
                 System.out.println("Данные о проекте сохранены.");
@@ -60,11 +68,11 @@ public class Main {
                         testPath.toString(),                   // testFilePath, путь к файлу теста
                         generatedTest                          // сгенерированный код теста
                 );
+
                 LocalTime endTime = LocalTime.now();
                 System.out.println("Тест создан в " + endTime);
                 Duration duration = Duration.between(startTime, endTime);
-        
-        // Выводим разницу в разных форматах
+
         System.out.println("Время выполнения:" + duration.toMinutesPart() + "м " + duration.toSecondsPart() + "с");
 
                 

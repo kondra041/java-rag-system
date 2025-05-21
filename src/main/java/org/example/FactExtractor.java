@@ -39,7 +39,7 @@ public class FactExtractor {
                 .orElseThrow(() -> new RuntimeException("Не удалось распарсить файл: " + file.getName()));
 
         String filePath = file.getAbsolutePath();
-        Path projectSrcPath = Paths.get("C:/spring-petclinic/src/main/java"); // ← путь к корню проекта с исходниками
+        Path projectSrcPath = Paths.get(ConfigLoader.getProjectDir() + "/src/main/java"); // ← путь к корню проекта с исходниками
 
         // Получаем пакет
         String packageName = cu.getPackageDeclaration()
@@ -177,7 +177,6 @@ public class FactExtractor {
         }
 
         QueryResp.QueryResult classData = results.get(0);
-        System.out.println(classData.getEntity());
 
         Map<String, Object> entity = classData.getEntity();
 
@@ -251,7 +250,6 @@ public class FactExtractor {
             }
 
         }
-        System.out.println(relevantCode);
         return relevantCode.toString();
     }
 
@@ -263,10 +261,8 @@ public class FactExtractor {
     public static List<String> searchRelevantKnowledge(String text, int topK) throws Exception {
 
         float[] queryEmbedding = EmbeddingService.getEmbedding(text);
-        System.out.println(queryEmbedding[0] + "--- " + queryEmbedding[767]);
 
         FloatVec queryVector = new FloatVec(queryEmbedding);
-        System.out.println("Query: " + text);
         // Создаём запрос на поиск
         SearchReq searchReq = SearchReq.builder()
                 .collectionName(PROJECT_KNOWLEDGE_COLLECTION)

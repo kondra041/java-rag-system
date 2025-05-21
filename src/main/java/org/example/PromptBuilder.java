@@ -15,12 +15,16 @@ public class PromptBuilder {
 
         try {
             projectKnowledge = getDependencies(className);
+
+            if(!projectKnowledge.isEmpty()) {
+                System.out.println("НАЙДЕНЫ РЕЛЕВАНТНЫЕ ДАННЫЕ:");
+            }
             System.out.println(projectKnowledge);
         } catch (Exception e) {
             e.printStackTrace();
         }
 
-        String prompt = "Generate a test for the following Spring controller, taking into account its dependencies and imported classes.\n";
+        String prompt = "Generate at least 4 JUnit-5 tests using MockMvc for the following Spring controller, taking into account its dependencies and imported classes.\n";
         prompt += "Controller code:\n```java\n" + controllerCode + "\n```\n";
 
         if (projectKnowledge != null && !projectKnowledge.isEmpty()) {

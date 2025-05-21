@@ -4,17 +4,20 @@ import io.milvus.param.R;
 import io.milvus.param.dml.SearchParam;
 import io.milvus.v2.client.ConnectConfig;
 import io.milvus.v2.client.MilvusClientV2;
-import io.milvus.v2.service.collection.request.HasCollectionReq;
-import io.milvus.v2.service.collection.request.LoadCollectionReq;
+import io.milvus.v2.common.IndexParam;
+import io.milvus.v2.service.collection.request.*;
 import io.milvus.v2.service.utility.request.FlushReq;
 import io.milvus.v2.service.vector.request.GetReq;
 import io.milvus.v2.service.vector.request.SearchReq;
 import io.milvus.v2.service.vector.response.GetResp;
 import io.milvus.v2.service.vector.response.QueryResp;
-import io.milvus.v2.service.collection.request.DropCollectionReq;
 import io.milvus.v2.service.vector.response.SearchResp;
-import io.milvus.v2.service.collection.request.GetCollectionStatsReq;
 import io.milvus.v2.service.collection.response.GetCollectionStatsResp;
+
+import io.milvus.v2.service.collection.request.CreateCollectionReq.FieldSchema;
+import io.milvus.v2.service.index.request.CreateIndexReq;
+import io.milvus.v2.common.DataType;
+
 
 import java.util.Arrays;
 import java.util.Collections;
@@ -125,13 +128,29 @@ public class MilvusV2 {
     }
 
     public static long getRowCount(String collectionName) {
-        GetCollectionStatsReq req = GetCollectionStatsReq.builder()
-                .collectionName(collectionName)
-                .build();
+        try {
 
-        GetCollectionStatsResp resp = client.getCollectionStats(req);
+            if (!hasCollectionByName(collectionName)) {
+                System.err.println("Коллекция " + collectionName + " не существует");
+                return 0;
+            }
 
-        return resp.getNumOfEntities();
+            // Загружаем коллекцию в память
+            loadCollection(collectionName);
+
+            // Синхронизируем данные
+            flush(collectionName);
+
+            GetCollectionStatsReq req = GetCollectionStatsReq.builder()
+                    .collectionName(collectionName)
+                    .build();
+
+            GetCollectionStatsResp resp = client.getCollectionStats(req);
+            return resp.getNumOfEntities();
+        } catch (Exception e) {
+            System.err.println("Ошибка при получении количества записей: " + e.getMessage());
+            return -1;
+        }
     }
 
     public static void deleteCollectionByName(String name) {
@@ -140,6 +159,146 @@ public class MilvusV2 {
                         .collectionName(name)
                         .build()
         );
+    }
+
+    public static void createTestsCollection() {
+        try {
+            // Создаем схему коллекции
+            CreateCollectionReq.CollectionSchema collectionSchema = client.createSchema();
+
+            // Добавляем поля согласно схеме из скриншота
+            collectionSchema.addField(AddFieldReq.builder()
+                    .fieldName("Auto_id")
+                    .dataType(DataType.Int64)
+                    .isPrimaryKey(true)
+                    .autoID(true)
+                    .description("The Primary Key")
+                    .build());
+
+            collectionSchema.addField(AddFieldReq.builder()
+                    .fieldName("emb_code")
+                    .dataType(DataType.FloatVector)
+                    .dimension(768)
+                    .build());
+
+            collectionSchema.addField(AddFieldReq.builder()
+                    .fieldName("source_file")
+                    .dataType(DataType.VarChar)
+                    .maxLength(128)
+                    .build());
+
+            collectionSchema.addField(AddFieldReq.builder()
+                    .fieldName("test_path")
+                    .dataType(DataType.VarChar)
+                    .maxLength(256)
+                    .build());
+
+            collectionSchema.addField(AddFieldReq.builder()
+                    .fieldName("test_code")
+                    .dataType(DataType.VarChar)
+                    .maxLength(8192)
+                    .build());
+
+            collectionSchema.addField(AddFieldReq.builder()
+                    .fieldName("status")
+                    .dataType(DataType.VarChar)
+                    .maxLength(24)
+                    .isNullable(true)
+                    .build());
+
+            // Параметры индекса для векторного поля
+            IndexParam indexParam = IndexParam.builder()
+                    .fieldName("emb_code")  // Индексируем векторное поле
+                    .metricType(IndexParam.MetricType.COSINE)  // Косинусное расстояние
+                    .build();
+
+            // Создаем коллекцию
+            CreateCollectionReq createCollectionReq = CreateCollectionReq.builder()
+                    .collectionName(CODE_TESTS_COLLECTION)
+                    .collectionSchema(collectionSchema)
+                    .indexParams(Collections.singletonList(indexParam))
+                    .build();
+
+            client.createCollection(createCollectionReq);
+            System.out.println("Коллекция " + CODE_TESTS_COLLECTION + " успешно создана");
+        } catch (Exception e) {
+            System.err.println("Ошибка при создании коллекции " + CODE_TESTS_COLLECTION + ": " + e.getMessage());
+        }
+    }
+
+    public static void createCodeCollection() {
+        try {
+            // Создаем схему коллекции
+            CreateCollectionReq.CollectionSchema collectionSchema = client.createSchema();
+
+            // Добавляем поля согласно схеме
+            collectionSchema.addField(AddFieldReq.builder()
+                    .fieldName("file_id")
+                    .dataType(DataType.VarChar)
+                    .maxLength(64)
+                    .isPrimaryKey(true)
+                    .description("The Primary Key")
+                    .build());
+
+            collectionSchema.addField(AddFieldReq.builder()
+                    .fieldName("code_embed")
+                    .dataType(DataType.FloatVector)
+                    .dimension(768)  // Размерность вектора
+                    .build());
+
+            collectionSchema.addField(AddFieldReq.builder()
+                    .fieldName("file_path")
+                    .dataType(DataType.VarChar)
+                    .maxLength(512)
+                    .build());
+
+            collectionSchema.addField(AddFieldReq.builder()
+                    .fieldName("package")
+                    .dataType(DataType.VarChar)
+                    .maxLength(512)
+                    .build());
+
+            collectionSchema.addField(AddFieldReq.builder()
+                    .fieldName("class_name")
+                    .dataType(DataType.VarChar)
+                    .maxLength(128)
+                    .build());
+
+            collectionSchema.addField(AddFieldReq.builder()
+                    .fieldName("methods")
+                    .dataType(DataType.JSON)
+                    .build());
+
+            collectionSchema.addField(AddFieldReq.builder()
+                    .fieldName("depends_on")
+                    .dataType(DataType.JSON)
+                    .build());
+
+            collectionSchema.addField(AddFieldReq.builder()
+                    .fieldName("last_commit")
+                    .dataType(DataType.VarChar)
+                    .maxLength(50)
+                    .isNullable(true)  // Поле может быть null
+                    .build());
+
+            // Параметры индекса для векторного поля
+            IndexParam indexParam = IndexParam.builder()
+                    .fieldName("code_embed")  // Индексируем векторное поле
+                    .metricType(IndexParam.MetricType.COSINE)  // Косинусное расстояние
+                    .build();
+
+            // Создаем коллекцию
+            CreateCollectionReq createCollectionReq = CreateCollectionReq.builder()
+                    .collectionName(PROJECT_KNOWLEDGE_COLLECTION)
+                    .collectionSchema(collectionSchema)
+                    .indexParams(Collections.singletonList(indexParam))
+                    .build();
+
+            client.createCollection(createCollectionReq);
+            System.out.println("Коллекция " + PROJECT_KNOWLEDGE_COLLECTION +" успешно создана");
+        } catch (Exception e) {
+            System.err.println("Ошибка при создании коллекции " + PROJECT_KNOWLEDGE_COLLECTION + ": " + e.getMessage());
+        }
     }
 
 

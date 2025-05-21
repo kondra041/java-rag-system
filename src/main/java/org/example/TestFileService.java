@@ -32,7 +32,6 @@ public class TestFileService {
     // Сохранение теста в файл
     public static void saveTest(Path testPath, String generatedTest) throws IOException {
         // Сначала вытаскиваем чистый Java-код
-        System.out.println("generatedTest: " + generatedTest);
         String code = extractJavaCode(generatedTest);
 
         Files.createDirectories(testPath.getParent());
